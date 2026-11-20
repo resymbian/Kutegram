@@ -24,6 +24,13 @@ S60 3rd Edition devices top out at Qt 4.6.3, so sisGram cannot run on an E51
 even with Qt installed. S60 5th Edition is included on a best-effort basis with
 Qt 4.7.3; Symbian^3/Belle with Qt 4.7.4 is the tested target.
 
+For S60 3rd Edition devices (E51, E71, N95, ...), use
+[**J2MEgram**](https://github.com/smbdsbrain/J2MEgram) instead. It is a Java ME
+client that speaks MTProto directly from the handset — no relay or proxy is
+required — and the Nokia E51 is explicitly listed among the phones it has been
+tested on. Copy the matching `.jar` + `.jad` from its latest release to the
+phone and open the `.jad`.
+
 ## Installation
 
 1. Go to the [latest release](https://github.com/resymbian/Kutegram/releases/latest).
