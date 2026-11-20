@@ -19,5 +19,6 @@ obj
 build-stamp
 configure-stamp
 Kutegram
+libkg/apisecrets.h
 *.deb
 *.changes

@@ -31,6 +31,12 @@ winrt {
     WINRT_MANIFEST.version = $$VERSION".0"
 }
 
+# The vendored zlib (libkg/zlib) is compiled with -std=c99 (see
+# libkg/mbedtls/mbedtls.pri). In strict C99 mode the POSIX declarations of
+# read/write/lseek/close are hidden, which GCC >= 14 rejects as implicit
+# declarations. Tell zlib that <unistd.h> is available.
+unix:DEFINES += HAVE_UNISTD_H
+
 DEFINES += QT_USE_FAST_CONCATENATION QT_USE_FAST_OPERATOR_PLUS
 CONFIG(release, debug|release):DEFINES += QT_NO_DEBUG_OUTPUT KG_NO_DEBUG KG_NO_INFO
 
