@@ -87,24 +87,8 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Write libkg/apisecrets.h
-        env:
-          API_ID: ${{ secrets.KUTEGRAM_API_ID }}
-          API_HASH: ${{ secrets.KUTEGRAM_API_HASH }}
-        run: |
-          if [ -n "$API_ID" ] && [ -n "$API_HASH" ]; then
-            cat > libkg/apisecrets.h <<EOF
-          #ifndef APISECRETS_H
-          #define APISECRETS_H
-
-          #define KUTEGRAM_API_ID $API_ID
-          #define KUTEGRAM_API_HASH "$API_HASH"
-
-          #endif // APISECRETS_H
-          EOF
-          else
-            cp libkg/apisecrets.h.empty libkg/apisecrets.h
-          fi
+      - name: Write default libkg/apisecrets.h
+        run: cp libkg/apisecrets.h.empty libkg/apisecrets.h
 
       - name: Build signed SIS
         shell: bash
