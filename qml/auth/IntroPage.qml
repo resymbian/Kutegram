@@ -1,4 +1,5 @@
 import QtQuick 1.0
+import "../control"
 
 Rectangle {
     id: introPageRect
@@ -38,8 +39,38 @@ Rectangle {
             anchors.right: parent.right
             text: "Just another unofficial Telegram client."
             wrapMode: Text.Wrap
-            horizontalAlignment: Text.AlignHCenter
             font.pixelSize: 12 * kgScaling
+        }
+
+        Text {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            text: "Telegram API ID / hash"
+            font.bold: true
+            wrapMode: Text.Wrap
+            font.pixelSize: 12 * kgScaling
+        }
+
+        Text {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            text: "Create an app at my.telegram.org/apps and enter its ID and hash once. They are stored on this device only."
+            wrapMode: Text.Wrap
+            font.pixelSize: 12 * kgScaling
+        }
+
+        LineEdit {
+            id: apiIdEdit
+            anchors.left: parent.left
+            anchors.right: parent.right
+            text: apiSettings.apiId > 0 ? apiSettings.apiId.toString() : ""
+        }
+
+        LineEdit {
+            id: apiHashEdit
+            anchors.left: parent.left
+            anchors.right: parent.right
+            text: apiSettings.apiHash
         }
 
         Button {
@@ -47,6 +78,15 @@ Rectangle {
             anchors.right: parent.right
             enabled: !root.authProgress
             onClicked: {
+                var id = parseInt(apiIdEdit.text, 10);
+                var hash = apiHashEdit.text.replace(/\s/g, "");
+                if (id <= 0 || hash.length < 20) {
+                    snackBar.text = "Enter the API ID and hash from my.telegram.org/apps.";
+                    return;
+                }
+
+                apiSettings.setCredentials(id, hash);
+                snackBar.close();
                 telegramClient.resetSession();
                 root.setAuthProgress(true);
                 telegramClient.start();

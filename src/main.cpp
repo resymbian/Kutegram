@@ -13,6 +13,7 @@
 #include "foldersmodel.h"
 #include "currentuserinfo.h"
 #include "platformutils.h"
+#include "apisettings.h"
 #include <QSystemSemaphore>
 #include <QSharedMemory>
 
@@ -104,6 +105,7 @@ int main(int argc, char *argv[])
     viewer.rootContext()->setContextProperty("kutegramVersion", QApplication::applicationVersion());
     viewer.rootContext()->setContextProperty("kutegramPlatform", systemName());
     viewer.rootContext()->setContextProperty("platformUtils", new PlatformUtils(&viewer));
+    viewer.rootContext()->setContextProperty("apiSettings", new ApiSettings(&viewer));
     viewer.rootContext()->setContextProperty("kgScaling", QFontMetrics(app.font()).height() / 14.0f);
     viewer.setMainQmlFile(QLatin1String("qrc:///qml/Main.qml"));
 #if QT_VERSION >= 0x050000

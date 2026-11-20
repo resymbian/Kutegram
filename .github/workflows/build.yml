@@ -10,12 +10,6 @@ on:
 permissions:
   contents: write
 
-env:
-  # Telegram API credentials are NOT part of this repository (libkg/apisecrets.h
-  # is generated at build time). Add KUTEGRAM_API_ID / KUTEGRAM_API_HASH as
-  # repository secrets to build a client that can log in.
-  HAS_API_SECRETS: ${{ secrets.KUTEGRAM_API_ID != '' }}
-
 jobs:
   # Compiles the C++/QML sources (libkg + zlib + mbedtls + app) on a hosted
   # runner. This target links Qt 5, which the project supports for
@@ -37,25 +31,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             qtbase5-dev qtbase5-dev-tools qtdeclarative5-dev qt5-qmake
 
-      - name: Write libkg/apisecrets.h
-        env:
-          API_ID: ${{ secrets.KUTEGRAM_API_ID }}
-          API_HASH: ${{ secrets.KUTEGRAM_API_HASH }}
-        run: |
-          if [ -n "$API_ID" ] && [ -n "$API_HASH" ]; then
-            cat > libkg/apisecrets.h <<EOF
-          #ifndef APISECRETS_H
-          #define APISECRETS_H
-
-          #define KUTEGRAM_API_ID $API_ID
-          #define KUTEGRAM_API_HASH "$API_HASH"
-
-          #endif // APISECRETS_H
-          EOF
-          else
-            echo "::notice::KUTEGRAM_API_ID/KUTEGRAM_API_HASH not set, building with placeholder credentials"
-            cp libkg/apisecrets.h.empty libkg/apisecrets.h
-          fi
+      # apisecrets.h is gitignored; the empty header is only a fallback. Each
+      # user enters their own API ID/hash in the app (see apicredentials.cpp).
+      - name: Write default libkg/apisecrets.h
+        run: cp libkg/apisecrets.h.empty libkg/apisecrets.h
 
       - name: Build
         run: |
@@ -187,7 +166,7 @@ jobs:
             echo
             echo "To install, open \`Kutegram.sis\` on the device (e.g. after copying it over USB or Bluetooth)."
             echo
-            echo "Note: without \`KUTEGRAM_API_ID\` / \`KUTEGRAM_API_HASH\` repository secrets the build uses placeholder credentials and can be installed but cannot log in to Telegram."
+            echo "Before logging in, create an app at my.telegram.org/apps and enter its API ID and hash on the app's first screen. They are saved on the device; no credentials are baked into this build."
           } > release-notes.md
 
           gh release create "$TAG" \

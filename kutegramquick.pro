@@ -112,6 +112,7 @@ SOURCES +=  \
     src/platformutils.cpp
 
 HEADERS += \
+    src/apisettings.h \
     src/dialogsmodel.h \
     src/messagesmodel.h \
     src/avatardownloader.h \
