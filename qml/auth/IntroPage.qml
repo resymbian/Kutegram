@@ -27,17 +27,17 @@ Rectangle {
         Text {
             anchors.left: parent.left
             anchors.right: parent.right
-            text: "Kutegram"
+            text: "sisGram"
             font.bold: true
             wrapMode: Text.Wrap
             horizontalAlignment: Text.AlignHCenter
-            font.pixelSize: 12 * kgScaling
+            font.pixelSize: 16 * kgScaling
         }
 
         Text {
             anchors.left: parent.left
             anchors.right: parent.right
-            text: "Just another unofficial Telegram client."
+            text: "Unofficial Telegram client for Symbian^3 / Belle. A fork of Kutegram."
             wrapMode: Text.Wrap
             font.pixelSize: 12 * kgScaling
         }

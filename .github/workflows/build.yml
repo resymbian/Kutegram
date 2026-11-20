@@ -87,8 +87,27 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Write default libkg/apisecrets.h
-        run: cp libkg/apisecrets.h.empty libkg/apisecrets.h
+      # Optional project-wide defaults. Users can override them in the app;
+      # without secrets the empty header is used and the first screen asks
+      # for the credentials.
+      - name: Write libkg/apisecrets.h
+        env:
+          API_ID: ${{ secrets.KUTEGRAM_API_ID }}
+          API_HASH: ${{ secrets.KUTEGRAM_API_HASH }}
+        run: |
+          if [ -n "$API_ID" ] && [ -n "$API_HASH" ]; then
+            cat > libkg/apisecrets.h <<EOF
+          #ifndef APISECRETS_H
+          #define APISECRETS_H
+
+          #define KUTEGRAM_API_ID $API_ID
+          #define KUTEGRAM_API_HASH "$API_HASH"
+
+          #endif // APISECRETS_H
+          EOF
+          else
+            cp libkg/apisecrets.h.empty libkg/apisecrets.h
+          fi
 
       - name: Build signed SIS
         shell: bash
@@ -101,14 +120,21 @@ jobs:
             -v "$GITHUB_WORKSPACE:/work:ro" \
             -v "$out:/out" \
             keinedx2/symbian-belle-buildtools:final /work /out
-          cp "$out/Kutegram.sis" .
+          # The toolchain names the package after TARGET; keep a stable asset
+          # name for the release download link.
+          sis=$(find "$out" -maxdepth 1 -name '*.sis' -print -quit)
+          if [ -z "$sis" ]; then
+            echo "::error::No .sis produced by the toolchain" >&2
+            exit 1
+          fi
+          cp "$sis" sisGram.sis
 
       - name: Verify SIS header
         shell: bash
         run: |
           python3 - <<'EOF'
           import struct
-          data = open("Kutegram.sis", "rb").read(40)
+          data = open("sisGram.sis", "rb").read(40)
           uid1, _, uid3, _ = struct.unpack("<IIII", data[:16])
           assert uid1 == 0x10201A7A, hex(uid1)
           assert uid3 == 0xE0713D51, hex(uid3)
@@ -127,12 +153,12 @@ jobs:
 
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
-            TITLE="Kutegram $TAG (Symbian^3 / Belle)"
+            TITLE="sisGram $TAG (Symbian^3 / Belle)"
           else
             # Rolling release: the newest successful master build is always
-            # available at /releases/latest/download/Kutegram.sis
+            # available at /releases/latest/download/sisGram.sis
             TAG="symbian-latest"
-            TITLE="Kutegram Symbian^3 / Belle (latest)"
+            TITLE="sisGram Symbian^3 / Belle (latest)"
           fi
 
           # Recreate the release so an old .sis is never left attached and the
@@ -142,21 +168,21 @@ jobs:
           fi
 
           {
-            echo "Installable Symbian^3 / Belle package built from \`$GITHUB_SHA\`."
+            echo "**sisGram** is an unofficial Telegram client for Symbian^3 / Belle, a fork of [Kutegram](https://github.com/kutegram/quick). Built from \`$GITHUB_SHA\`."
             echo
-            echo "- File: \`Kutegram.sis\` (~1.8 MB), UID3 \`0xE0713D51\`"
+            echo "- File: \`sisGram.sis\` (~1.8 MB), UID3 \`0xE0713D51\`"
             echo "- Signed with the toolchain development certificate: the phone asks for confirmation when installing."
             echo "- Capabilities: ReadUserData, WriteUserData, UserEnvironment, NetworkServices, LocalServices (self-signable set)."
             echo
-            echo "To install, open \`Kutegram.sis\` on the device (e.g. after copying it over USB or Bluetooth)."
+            echo "To install, open \`sisGram.sis\` on the device (e.g. after copying it over USB or Bluetooth)."
             echo
-            echo "Before logging in, create an app at my.telegram.org/apps and enter its API ID and hash on the app's first screen. They are saved on the device; no credentials are baked into this build."
+            echo "On the first screen you can use the pre-filled Telegram API ID/hash or replace them with your own from my.telegram.org/apps. The values are saved on the device."
           } > release-notes.md
 
           gh release create "$TAG" \
             --target "$GITHUB_SHA" \
             --title "$TITLE" \
             --notes-file release-notes.md \
-            Kutegram.sis
+            sisGram.sis
 
-          echo "::notice::Published Kutegram.sis at https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+          echo "::notice::Published sisGram.sis at https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"

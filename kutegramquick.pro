@@ -1,5 +1,5 @@
-TARGET = Kutegram
-APPNAME = Kutegram
+TARGET = sisGram
+APPNAME = sisGram
 VERSION = 1.2.0
 PKG_VERSION = $$replace(VERSION, ".", ",")
 # Passed unquoted: stringified in C++ (see KG_STRINGIFY in main.cpp). Nested

@@ -45,17 +45,17 @@ PlatformUtils::PlatformUtils(QObject *parent)
     connect(&trayIcon, SIGNAL(activated(QSystemTrayIcon::ActivationReason)), this, SLOT(trayActivated(QSystemTrayIcon::ActivationReason)));
     connect(&trayMenu, SIGNAL(triggered(QAction*)), this, SLOT(menuTriggered(QAction*)));
 
-    trayMenu.addAction("Open Kutegram");
+    trayMenu.addAction("Open sisGram");
     trayMenu.addAction("Exit");
 
     trayIcon.setContextMenu(&trayMenu);
     trayIcon.setIcon(QIcon(":/kutegramquick_small.png"));
-    trayIcon.setToolTip("Kutegram");
+    trayIcon.setToolTip("sisGram");
     trayIcon.show();
 #endif
 
 #ifdef SYMBIAN3_READY
-    qint32 response = pigler.init("Kutegram"); //TODO think about randomization
+    qint32 response = pigler.init("sisGram"); //TODO think about randomization
     if (response >= 0) {
         if (response > 0)
             piglerHandleTap(response);

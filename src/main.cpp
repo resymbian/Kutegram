@@ -80,8 +80,8 @@ int main(int argc, char *argv[])
 #endif
 
     QApplication::setApplicationVersion(QString(KG_STRINGIFY(KUTEGRAM_VERSION)));
-    QApplication::setApplicationName("Kutegram");
-    QApplication::setOrganizationName("Kutegram");
+    QApplication::setApplicationName("sisGram");
+    QApplication::setOrganizationName("sisGram");
     QApplication::setOrganizationDomain("kg.crx.moe");
 
     QTextCodec *codec = QTextCodec::codecForName("UTF-8");
@@ -109,9 +109,9 @@ int main(int argc, char *argv[])
     viewer.rootContext()->setContextProperty("kgScaling", QFontMetrics(app.font()).height() / 14.0f);
     viewer.setMainQmlFile(QLatin1String("qrc:///qml/Main.qml"));
 #if QT_VERSION >= 0x050000
-    viewer.setTitle("Kutegram");
+    viewer.setTitle("sisGram");
 #else
-    viewer.setWindowTitle("Kutegram");
+    viewer.setWindowTitle("sisGram");
 #endif
     viewer.showExpanded();
 
