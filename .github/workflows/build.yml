@@ -19,7 +19,7 @@ jobs:
   # desktop binary builds but cannot render its UI (QtQuick 1 was removed from
   # Qt in 5.6). Runtime testing belongs to the Symbian job below.
   linux:
-    name: Linux / Qt 5 (compile + startup)
+    name: Linux / Qt 5 (compile only)
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -58,21 +58,23 @@ jobs:
           qmake ../kutegramquick.pro CONFIG+=release
           make -j"$(nproc)"
 
-      - name: Startup smoke test
+      # The Qt 5 binary cannot be started for testing: its QML is QtQuick 1.0,
+      # which Qt 5 does not ship, so setSource() fails and QQuickView aborts.
+      # This check instead guards the class of bug that broke the build before
+      # (a resource entry whose file name does not match the checkout).
+      - name: Validate QML resources
         run: |
-          cd build
-          rm -f /dev/shm/*Kutegram* || true
-          QT_QPA_PLATFORM=offscreen ./Kutegram > run.log 2>&1 &
-          pid=$!
-          sleep 5
-          if kill -0 "$pid"; then
-            echo "OK: process still running after 5s"
-            kill "$pid"
-          else
-            echo "::error::Kutegram exited immediately"
-            cat run.log
-            exit 1
-          fi
+          python3 - <<'EOF'
+          import re, os, sys
+          missing = []
+          for entry in re.findall(r"<file>([^<]+)</file>", open("resources.qrc").read()):
+              if not os.path.exists(entry):
+                  missing.append(entry)
+          if missing:
+              print("::error::resources.qrc references missing files:", *missing, sep="\n  ")
+              sys.exit(1)
+          print("All resources.qrc entries exist")
+          EOF
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
