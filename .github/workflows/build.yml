@@ -85,18 +85,23 @@ jobs:
 
   # Produces an installable .sis for Symbian^3 / Belle.
   #
-  # Why self-hosted: building a SIS needs Qt 4.7.4 cross-built for the device
-  # plus the Symbian^3 SDK (GCCE / SBSv2). The Qt SDK for Symbian was
-  # Windows-only and the Symbian SDKs are not redistributable, so this cannot
-  # run on GitHub-hosted runners.
+  # Builds the installable Symbian package.
   #
-  # Setup: register a runner with labels [self-hosted, symbian] that has the
-  # Qt 4.7.4 Symbian toolchain in PATH, then set the repository variable
-  # SYMBIAN_BUILD=true (Settings > Secrets and variables > Actions > Variables).
+  # The toolchain (Qt SDK 1.2.1 + Symbian^3 Qt 4.7.4, GCCE 4.4.1, SBSv2 and
+  # the E32/SIS tools) only ever shipped as a Windows install. The container
+  # below carries it under Wine, together with a build script that runs
+  # qmake -> sbs -> make sis for any Qt 4.7.4 project.
+  #
+  # Notes on the produced file:
+  # - It is signed with the toolchain's development certificate, so a phone
+  #   asks for confirmation on install (fine for personal use, not for the
+  #   Nokia Store, which is gone anyway).
+  # - Capabilities are the self-signable set. SwEvent needs a real developer
+  #   certificate; build with CONFIG+=sw_event and a developer cert for that.
   symbian-sis:
-    name: Symbian SIS (self-hosted)
-    if: vars.SYMBIAN_BUILD == 'true'
-    runs-on: [self-hosted, symbian]
+    name: Symbian SIS (Belle / GCCE)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -121,22 +126,34 @@ jobs:
             cp libkg/apisecrets.h.empty libkg/apisecrets.h
           fi
 
-      - name: Build SIS
+      - name: Build signed SIS
         shell: bash
         run: |
-          # SYMBIAN_VERSION=Symbian3 enables the Qt library deployment rules in
-          # kutegramquick.pro (and links the Pigler notification plugin).
-          mkdir build-sis && cd build-sis
-          qmake ../kutegramquick.pro \
-            -spec symbian-gcce \
-            CONFIG+=release \
-            SYMBIAN_VERSION=Symbian3
-          make -j"$(nproc)"
-          make sis
+          out="$RUNNER_TEMP/sis-out"
+          mkdir -p "$out"
+          # The script stages the project into the container's wine workspace,
+          # so the checkout can stay read-only.
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/work:ro" \
+            -v "$out:/out" \
+            keinedx2/symbian-belle-buildtools:final /work /out
+          cp "$out/Kutegram.sis" .
+
+      - name: Verify SIS header
+        shell: bash
+        run: |
+          python3 - <<'EOF'
+          import struct
+          data = open("Kutegram.sis", "rb").read(40)
+          uid1, _, uid3, _ = struct.unpack("<IIII", data[:16])
+          assert uid1 == 0x10201A7A, hex(uid1)
+          assert uid3 == 0xE0713D51, hex(uid3)
+          print(f"SIS ok: uid3={uid3:#010x}")
+          EOF
 
       - name: Upload SIS
         uses: actions/upload-artifact@v4
         with:
           name: Kutegram-symbian3-sis
-          path: build-sis/*.sis
+          path: Kutegram.sis
           if-no-files-found: error

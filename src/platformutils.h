@@ -9,6 +9,7 @@
 #endif
 #include <QUrl>
 #include <QHash>
+#include <QVariant> // QVariantMap, not pulled in transitively by Qt 4.7
 #include <QWidget>
 
 #ifdef SYMBIAN3_READY

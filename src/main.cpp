@@ -23,6 +23,9 @@
 #include <QtDeclarative>
 #endif
 
+#define KG_STRINGIFY_(x) #x
+#define KG_STRINGIFY(x) KG_STRINGIFY_(x)
+
 #if QT_VERSION >= 0x040702
 #include <QNetworkConfigurationManager>
 #include <QNetworkSession>
@@ -75,7 +78,7 @@ int main(int argc, char *argv[])
     QApplication::setAttribute(Qt::AA_UseOpenGLES, true);
 #endif
 
-    QApplication::setApplicationVersion(QString(VERSION).replace("\"", ""));
+    QApplication::setApplicationVersion(QString(KG_STRINGIFY(KUTEGRAM_VERSION)));
     QApplication::setApplicationName("Kutegram");
     QApplication::setOrganizationName("Kutegram");
     QApplication::setOrganizationDomain("kg.crx.moe");
