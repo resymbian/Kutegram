@@ -5,6 +5,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Creating a Release needs write access to repository contents. Pull requests
+# from forks only get a read-only token, so the publish step is skipped there.
+permissions:
+  contents: write
+
 env:
   # Telegram API credentials are NOT part of this repository (libkg/apisecrets.h
   # is generated at build time). Add KUTEGRAM_API_ID / KUTEGRAM_API_HASH as
@@ -76,12 +81,8 @@ jobs:
           print("All resources.qrc entries exist")
           EOF
 
-      - name: Upload binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kutegram-linux-qt5
-          path: build/Kutegram
-          if-no-files-found: error
+      # No artifact is published here: this job is only a compile check. The
+      # installable package is published as a Release by the Symbian job.
 
   # Produces an installable .sis for Symbian^3 / Belle.
   #
@@ -151,9 +152,48 @@ jobs:
           print(f"SIS ok: uid3={uid3:#010x}")
           EOF
 
-      - name: Upload SIS
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kutegram-symbian3-sis
-          path: Kutegram.sis
-          if-no-files-found: error
+      - name: Publish SIS as a GitHub Release
+        # Releases are only made for master pushes, version tags and manual
+        # runs -- never for pull requests or feature branches.
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            TITLE="Kutegram $TAG (Symbian^3 / Belle)"
+          else
+            # Rolling release: the newest successful master build is always
+            # available at /releases/latest/download/Kutegram.sis
+            TAG="symbian-latest"
+            TITLE="Kutegram Symbian^3 / Belle (latest)"
+          fi
+
+          # Recreate the release so an old .sis is never left attached and the
+          # rolling tag moves to the commit that was just built.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --yes --cleanup-tag
+          fi
+
+          {
+            echo "Installable Symbian^3 / Belle package built from \`$GITHUB_SHA\`."
+            echo
+            echo "- File: \`Kutegram.sis\` (~1.8 MB), UID3 \`0xE0713D51\`"
+            echo "- Signed with the toolchain development certificate: the phone asks for confirmation when installing."
+            echo "- Capabilities: ReadUserData, WriteUserData, UserEnvironment, NetworkServices, LocalServices (self-signable set)."
+            echo
+            echo "To install, open \`Kutegram.sis\` on the device (e.g. after copying it over USB or Bluetooth)."
+            echo
+            echo "Note: without \`KUTEGRAM_API_ID\` / \`KUTEGRAM_API_HASH\` repository secrets the build uses placeholder credentials and can be installed but cannot log in to Telegram."
+          } > release-notes.md
+
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "$TITLE" \
+            --notes-file release-notes.md \
+            Kutegram.sis
+
+          echo "::notice::Published Kutegram.sis at https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
