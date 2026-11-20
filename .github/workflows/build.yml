@@ -141,6 +141,33 @@ jobs:
           print(f"SIS ok: uid3={uid3:#010x}")
           EOF
 
+      # Ship the official Qt runtime SIS files from the Qt SDK inside the
+      # build image, so users never have to download Qt from a third party.
+      - name: Package official Qt runtimes
+        shell: bash
+        run: |
+          set -euo pipefail
+          QT_SIS=/opt/wine/drive_c/QtSDK/Symbian/sis
+          IMAGE=keinedx2/symbian-belle-buildtools:final
+          docker run --rm -v "$PWD:/out" --entrypoint cp "$IMAGE" \
+            "$QT_SIS/Symbian_Anna/Qt/4.7.4/Qt-4.7.403-for-Anna.sis" /out/Qt-4.7.4-Symbian3-Belle.sis
+          docker run --rm -v "$PWD:/out" --entrypoint cp "$IMAGE" \
+            "$QT_SIS/S60_5th_Edition/Qt/4.7.3/Qt-4.7.3-for-S605th.sis" /out/Qt-4.7.3-S60-5th.sis
+          python3 - <<'EOF'
+          import struct
+          expected = {
+              "Qt-4.7.4-Symbian3-Belle.sis": 0x2001E61C,
+              "Qt-4.7.3-S60-5th.sis": None,
+          }
+          for name, uid3 in expected.items():
+              data = open(name, "rb").read(40)
+              uid1, _, actual_uid3, _ = struct.unpack("<IIII", data[:16])
+              assert uid1 == 0x10201A7A, (name, hex(uid1))
+              if uid3 is not None:
+                  assert actual_uid3 == uid3, (name, hex(actual_uid3))
+              print(f"{name}: ok ({len(open(name, 'rb').read())} bytes)")
+          EOF
+
       - name: Publish SIS as a GitHub Release
         # Releases are only made for master pushes, version tags and manual
         # runs -- never for pull requests or feature branches.
@@ -168,21 +195,35 @@ jobs:
           fi
 
           {
-            echo "**sisGram** is an unofficial Telegram client for Symbian^3 / Belle, a fork of [Kutegram](https://github.com/kutegram/quick). Built from \`$GITHUB_SHA\`."
+            echo "**sisGram** is an unofficial Telegram client for Symbian, a fork of [Kutegram](https://github.com/kutegram/quick). Built from \`$GITHUB_SHA\`."
             echo
-            echo "- File: \`sisGram.sis\` (~1.8 MB), UID3 \`0xE0713D51\`"
-            echo "- Signed with the toolchain development certificate: the phone asks for confirmation when installing."
-            echo "- Capabilities: ReadUserData, WriteUserData, UserEnvironment, NetworkServices, LocalServices (self-signable set)."
+            echo "### Install"
             echo
-            echo "To install, open \`sisGram.sis\` on the device (e.g. after copying it over USB or Bluetooth)."
+            echo "1. Copy the files to the phone (USB / Bluetooth / memory card)."
+            echo "2. Install the Qt runtime for your device **first**:"
+            echo "   - Symbian^3 / Anna / Belle (N8, E7, C7, 700, 808...): \`Qt-4.7.4-Symbian3-Belle.sis\`"
+            echo "   - S60 5th Edition (N97, 5800, X6...): \`Qt-4.7.3-S60-5th.sis\`"
+            echo "3. Then install \`sisGram.sis\` (UID3 \`0xE0713D51\`, ~1.8 MB)."
             echo
-            echo "On the first screen you can use the pre-filled Telegram API ID/hash or replace them with your own from my.telegram.org/apps. The values are saved on the device."
+            echo "Both Qt packages are the official ones shipped inside the Qt SDK; no third-party downloads needed."
+            echo
+            echo "**S60 3rd Edition FP1 (e.g. Nokia E51) is not supported:** Qt 4.7 / Qt Quick is not available for that platform, so the app cannot run there."
+            echo
+            echo "### Signing and capabilities"
+            echo
+            echo "Self-signed with the toolchain development certificate (the phone asks for confirmation). Capabilities: ReadUserData, WriteUserData, UserEnvironment, NetworkServices, LocalServices."
+            echo
+            echo "### Telegram API credentials"
+            echo
+            echo "This build has project credentials pre-filled from repository secrets. You can replace them on the first screen with your own from my.telegram.org/apps; they are stored only on the device."
           } > release-notes.md
 
           gh release create "$TAG" \
             --target "$GITHUB_SHA" \
             --title "$TITLE" \
             --notes-file release-notes.md \
-            sisGram.sis
+            sisGram.sis \
+            Qt-4.7.4-Symbian3-Belle.sis \
+            Qt-4.7.3-S60-5th.sis
 
-          echo "::notice::Published sisGram.sis at https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+          echo "::notice::Published sisGram.sis + Qt runtimes at https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
