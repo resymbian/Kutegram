@@ -165,18 +165,31 @@ for f in "$SDK/env.bat" "$WORK/project/regen.bat" "$WORK/project/sbsbuild.bat" "
 done
 
 # --- qmake -> SBS/GCCE -> SIS --------------------------------------------------
+# xvfb-run can report a broken X connection after the Wine process has already
+# finished successfully; judge the result by the build logs and output files.
 cd /tmp
+set +e
 timeout 180 xvfb-run -a wine cmd /c "Z:\work\project\regen.bat" > "$LOGS/e51-regen.log" 2>&1
+set -e
 grep -q "QMAKE EXIT: 0" "$LOGS/e51-regen.log"
 
-script -qec "timeout 540 xvfb-run -a env SBS_CONFIG=arm.v5.urel.gcce4_4_1 wine cmd /c \"Z:\\work\\project\\sbsbuild.bat\"" \
+set +e
+script -qec "timeout 540 xvfb-run -a env SBS_CONFIG=arm.v5.urel.gcce4_4_1 wine cmd /c \"Z:\work\project\sbsbuild.bat\"" \
   "$LOGS/e51-sbs.typescript" > "$LOGS/e51-sbs.log" 2>&1
+set -e
 if ! grep -aq "sbs:errors:0" "$LOGS/e51-sbs.log"; then
   sed -r 's/\x1B\[[0-9;?]*[a-zA-Z]//g' "$LOGS/e51-sbs.log" | tr -d '\r' | tail -80 >&2
   exit 1
 fi
+EXE="$SDK/epoc32/release/armv5/urel/sisGramE51.exe"
+if [ ! -s "$EXE" ]; then
+  echo "SBS reported success but $EXE is missing" >&2
+  exit 1
+fi
 
+set +e
 timeout 300 xvfb-run -a wine cmd /c "Z:\work\project\sispack.bat" > "$LOGS/e51-sispack.log" 2>&1
+set -e
 grep -q "SIS EXIT: 0" "$LOGS/e51-sispack.log"
 
 # --- collect only official outputs --------------------------------------------
