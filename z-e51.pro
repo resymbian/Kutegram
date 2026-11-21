@@ -53,16 +53,6 @@ symbian {
     # Show the same icon as the Belle build in the S60 application grid.
     ICON = kutegramquick.svg
 
-    # qmake's symbian qt.prf hardcodes the dependency to 0x2001E61C (the full
-    # capability Qt package used on Symbian^3/Anna). On S60 3rd FP1 the Qt
-    # 4.6.3 runtime shipped by Nokia has UID3 0x2001E62D, so depending on
-    # 0x2001E61C makes the installer ask for a nonexistent "Qt 4.7" package.
-    default_deployment.pkg_prerules -= pkg_depends_qt
-    qt_depends_s60fp1 = \
-        "; Dependency to Qt 4.6.3 for S60 3rd Edition FP1" \
-        "(0x2001E62D), 4, 6, 3, {\"Qt\"}"
-    default_deployment.pkg_prerules += qt_depends_s60fp1
-
     TARGET.CAPABILITY += ReadUserData WriteUserData UserEnvironment NetworkServices LocalServices
 
     supported_platforms = \
