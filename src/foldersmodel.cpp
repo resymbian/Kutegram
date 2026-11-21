@@ -118,7 +118,9 @@ void FoldersModel::messagesGetDialogFiltersResponse(TgVector data, TgLongVariant
     }
 
     QList<TgObject> rows;
+#if QT_VERSION >= QT_VERSION_CHECK(4, 7, 0)
     rows.reserve(data.size());
+#endif
 
     for (qint32 i = 0; i < data.size(); ++i) {
         rows.append(createRow(data[i].toMap()));

@@ -270,7 +270,9 @@ void MessagesModel::handleHistoryResponse(TgObject data, TgLongVariant messageId
     }
 
     QList<TgObject> messagesRows;
+#if QT_VERSION >= QT_VERSION_CHECK(4, 7, 0)
     messagesRows.reserve(messages.size());
+#endif
 
     for (qint32 i = messages.size() - 1; i >= 0; --i) {
         TgObject message = messages[i].toMap();
@@ -351,7 +353,9 @@ void MessagesModel::handleHistoryResponseUpwards(TgObject data, TgLongVariant me
     }
 
     QList<TgObject> messagesRows;
+#if QT_VERSION >= QT_VERSION_CHECK(4, 7, 0)
     messagesRows.reserve(messages.size());
+#endif
 
     for (qint32 i = messages.size() - 1; i >= 0; --i) {
         TgObject message = messages[i].toMap();
@@ -712,7 +716,11 @@ void MessagesModel::downloadFile(qint32 index)
     QDir::home().mkdir("Kutegram");
 
     QString fileName = _history[index]["mediaFileName"].toString();
-    if (fileName.isEmpty()) fileName = QString::number(QDateTime::currentDateTime().toMSecsSinceEpoch());
+    // QDateTime::toMSecsSinceEpoch() is Qt 4.7+; keep the Qt 4.6.3 E51 build working.
+    if (fileName.isEmpty()) {
+        fileName = QString::number((qint64)QDateTime::currentDateTime().toTime_t() * 1000
+                                   + QTime::currentTime().msec());
+    }
 
     QStringList split = fileName.split('.');
     QString fileNameBefore;

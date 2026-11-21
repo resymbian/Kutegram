@@ -1,6 +1,8 @@
 # sisGram
 
-An unofficial Telegram client for Symbian^3 / Belle, built in Qt Quick and C++.
+An unofficial Telegram client for Symbian^3 / Belle and S60 3rd Edition FP1
+(e.g. Nokia E51). Symbian^3 / Belle uses Qt Quick; the E51 build is a separate
+Qt 4.6.3 / QWidget port that talks MTProto directly.
 
 **sisGram is a fork of [Kutegram](https://github.com/kutegram/quick).** It is not
 affiliated with Telegram or Nokia. The name is a nod to the `.sis` installation
@@ -13,39 +15,42 @@ an installable package.
 
 ## Devices
 
-| Platform | Examples | Supported? | Qt runtime to install first |
+| Platform | Examples | Supported? | Files to install, in order |
 | --- | --- | --- | --- |
-| Symbian^3 / Anna / Belle | N8, E7, C7, C6-01, X7, 700, 701, 808 | Yes | `Qt-4.7.4-Symbian3-Belle.sis` |
-| S60 5th Edition | N97, 5800, X6, 5230, C5-03 | Best effort | `Qt-4.7.3-S60-5th.sis` |
-| S60 3rd Edition FP1/FP2 (e.g. **Nokia E51**) | E51, E71, N95, 6120 | **No** | Qt 4.7 / Qt Quick was never shipped for these devices |
+| Symbian^3 / Anna / Belle | N8, E7, C7, C6-01, X7, 700, 701, 808 | Yes | `Qt-4.7.4-Symbian3-Belle.sis` → `sisGram.sis` |
+| S60 5th Edition | N97, 5800, X6, 5230, C5-03 | Best effort | `Qt-4.7.3-S60-5th.sis` → `sisGram.sis` |
+| S60 3rd Edition FP1 (**Nokia E51**) | E51, 6120 | Yes (QWidget port) | `Qt-4.6.3-S60-3rd-FP1-SmartInstaller.sis` → `sisGram-E51.sis` |
+| S60 3rd Edition FP2 | E71, N95, 6220 | Unverified | Same E51 packages may work, but only FP1 has been built for |
 
-The application uses Qt Quick 1 (`QDeclarativeView`), which requires Qt 4.7.
-S60 3rd Edition devices top out at Qt 4.6.3, so sisGram cannot run on an E51
-even with Qt installed. S60 5th Edition is included on a best-effort basis with
-Qt 4.7.3; Symbian^3/Belle with Qt 4.7.4 is the tested target.
+Symbian^3/Belle uses the original Qt Quick 1 UI (Qt 4.7.4). S60 3rd Edition FP1
+cannot run Qt Quick: it tops out at official Qt 4.6.3, so `sisGram-E51.sis` uses
+a separate QWidget interface and the same `libkg` protocol library. Transport
+is direct MTProto over `QTcpSocket` — no JVM, proxy or relay is needed.
 
-For S60 3rd Edition devices (E51, E71, N95, ...), use
-[**J2MEgram**](https://github.com/smbdsbrain/J2MEgram) instead. It is a Java ME
-client that speaks MTProto directly from the handset — no relay or proxy is
-required — and the Nokia E51 is explicitly listed among the phones it has been
-tested on. Copy the matching `.jar` + `.jad` from its latest release to the
-phone and open the `.jad`.
+[**J2MEgram**](https://github.com/smbdsbrain/J2MEgram) remains a usable Java ME
+alternative for these phones; the E51 is among its tested devices. Its tested
+setup used Wi-Fi with an external MTProxy on a high port, so the native Qt build
+above is the simpler option when it installs successfully.
 
 ## Installation
 
 1. Go to the [latest release](https://github.com/resymbian/Kutegram/releases/latest).
-2. Download **both** the Qt runtime for your device (see the table above) and
-   `sisGram.sis`. The Qt packages are the official installers taken from the
-   Qt SDK, so there is no need to fetch anything from third-party sites.
+2. Download the Qt runtime and the app package for your device (see the table
+   above). All Qt packages are the official ones shipped inside Nokia Qt SDKs;
+   no third-party downloads are needed.
 3. Copy the files to the phone (USB, Bluetooth or memory card) and open them in
    the file manager.
-4. **Install the Qt runtime first**, then `sisGram.sis`.
+4. **Install the Qt runtime first**, then the app.
 
-`sisGram.sis` is self-signed with the toolchain development certificate: the
-phone will ask for confirmation during installation. Requested capabilities are
-`ReadUserData`, `WriteUserData`, `UserEnvironment`, `NetworkServices` and
-`LocalServices` — the self-signable set. `SwEvent` is deliberately not requested
-because it requires a paid developer certificate.
+The E51 runtime is Nokia's Qt Smart Installer. It contacts Nokia's distribution
+servers to fetch Qt 4.6.3, so the phone needs a data connection at install time.
+If that service is unavailable, use J2MEgram instead.
+
+Both `sisGram.sis` and `sisGram-E51.sis` are self-signed with the toolchain
+development certificate: the phone will ask for confirmation during installation.
+Requested capabilities are `ReadUserData`, `WriteUserData`, `UserEnvironment`,
+`NetworkServices` and `LocalServices` — the self-signable set. `SwEvent` is
+deliberately not requested because it requires a paid developer certificate.
 
 ## Telegram API credentials
 
@@ -70,15 +75,34 @@ own if that matters to you.
 
 ## Building from source
 
-The Symbian package needs Qt 4.7.4 for Symbian, GCCE and the SBSv2 toolchain.
-CI builds it inside `keinedx2/symbian-belle-buildtools:final` (a Qt SDK 1.2.1
-image running under Wine):
+The Symbian^3/Belle package needs Qt 4.7.4 for Symbian, GCCE and the SBSv2
+toolchain. CI builds it inside `keinedx2/symbian-belle-buildtools:final` (a Qt
+SDK 1.2.1 image running under Wine):
 
 ```sh
 docker run --rm \
   -v "$PWD:/work:ro" -v "$OUT:/out" \
   keinedx2/symbian-belle-buildtools:final /work /out
 ```
+
+The E51 build uses Qt 4.6.3 from the original Nokia Qt SDK 1.1.2. CI verifies
+the installer hash `ce16cbd7c99e607f51789d857fe8573852a999053a79af1fa20d645457044e30`,
+then extracts and builds it only inside the same container as uid `1001:1003`:
+
+```sh
+curl -fLO https://archive.org/download/nokia_sdks_n_dev_tools/Qt_SDK_Win_offline_v1_1_2_en.exe
+echo "ce16cbd7c99e607f51789d857fe8573852a999053a79af1fa20d645457044e30  Qt_SDK_Win_offline_v1_1_2_en.exe" | sha256sum -c -
+mkdir -p e51-out e51-work
+docker run --rm --platform linux/amd64 --entrypoint bash \
+  --user 1001:1003 --network=none \
+  -v "$PWD:/src:ro" -v "$PWD/e51-work:/work" -v "$PWD/e51-out:/out" \
+  -v "$PWD/Qt_SDK_Win_offline_v1_1_2_en.exe:/work/installer.exe:ro" \
+  keinedx2/symbian-belle-buildtools:final /src/tools/build-e51.sh
+```
+
+`tools/build-e51.sh` never executes the Windows installer: it extracts the
+official 7z payload components, builds with GCCE 4.4.1 and writes
+`sisGram-E51.sis` plus the official Qt Smart Installer to `e51-out/`.
 
 For a local Qt 5 compile-only check:
 

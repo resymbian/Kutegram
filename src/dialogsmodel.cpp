@@ -219,7 +219,9 @@ void DialogsModel::messagesGetDialogsResponse(TgObject data, TgLongVariant messa
     }
 
     QList<TgObject> dialogsRows;
+#if QT_VERSION >= QT_VERSION_CHECK(4, 7, 0)
     dialogsRows.reserve(dialogsList.size());
+#endif
 
     QList<TgObject> folders;
     if (_folders)

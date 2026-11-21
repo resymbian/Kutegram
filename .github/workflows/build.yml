@@ -79,7 +79,7 @@ jobs:
   # - Capabilities are the self-signable set. SwEvent needs a real developer
   #   certificate; build with CONFIG+=sw_event and a developer cert for that.
   symbian-sis:
-    name: Symbian SIS (Belle / GCCE)
+    name: Symbian SIS (Belle + E51 / GCCE)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -168,6 +168,52 @@ jobs:
               print(f"{name}: ok ({len(open(name, 'rb').read())} bytes)")
           EOF
 
+      # The E51 QWidget port needs Qt 4.6.3, which is not in the Belle build
+      # image. Download the original Nokia installer, verify its pinned hash,
+      # then extract/build it entirely inside the non-root container.
+      - name: Download official Qt SDK 1.1.2 installer (E51 toolchain)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 --connect-timeout 30 \
+            -o "$RUNNER_TEMP/Qt_SDK_Win_offline_v1_1_2_en.exe" \
+            https://archive.org/download/nokia_sdks_n_dev_tools/Qt_SDK_Win_offline_v1_1_2_en.exe
+          echo "ce16cbd7c99e607f51789d857fe8573852a999053a79af1fa20d645457044e30  $RUNNER_TEMP/Qt_SDK_Win_offline_v1_1_2_en.exe" | sha256sum -c -
+
+      - name: Build S60 3rd FP1 / E51 SIS
+        shell: bash
+        run: |
+          set -euo pipefail
+          e51out="$RUNNER_TEMP/e51-out"
+          e51work="$RUNNER_TEMP/e51-work"
+          mkdir -p "$e51out" "$e51work"
+          docker run --rm \
+            --platform linux/amd64 \
+            --entrypoint bash \
+            --user 1001:1003 \
+            --network=none \
+            -v "$GITHUB_WORKSPACE:/src:ro" \
+            -v "$e51work:/work" \
+            -v "$e51out:/out" \
+            -v "$RUNNER_TEMP/Qt_SDK_Win_offline_v1_1_2_en.exe:/work/installer.exe:ro" \
+            -e API_ID="${{ secrets.KUTEGRAM_API_ID }}" \
+            -e API_HASH="${{ secrets.KUTEGRAM_API_HASH }}" \
+            keinedx2/symbian-belle-buildtools:final /src/tools/build-e51.sh
+
+      - name: Verify E51 outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/e51-out/sisGram-E51.sis" <<'EOF'
+          import struct, sys
+          data = open(sys.argv[1], "rb").read(40)
+          uid1, _, uid3, _ = struct.unpack("<IIII", data[:16])
+          assert uid1 == 0x10201A7A, hex(uid1)
+          assert uid3 == 0xE0713D52, hex(uid3)
+          print(f"sisGram-E51.sis ok: uid3={uid3:#010x}")
+          EOF
+          echo "66dd2d9298ef172741211bafcf3b8179184daf2c4ab48894ba659379d51c77bd  $RUNNER_TEMP/e51-out/Qt-4.6.3-S60-3rd-FP1-SmartInstaller.sis" | sha256sum -c -
+
       - name: Publish SIS as a GitHub Release
         # Releases are only made for master pushes, version tags and manual
         # runs -- never for pull requests or feature branches.
@@ -180,12 +226,12 @@ jobs:
 
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
-            TITLE="sisGram $TAG (Symbian^3 / Belle)"
+            TITLE="sisGram $TAG (Symbian)"
           else
             # Rolling release: the newest successful master build is always
             # available at /releases/latest/download/sisGram.sis
             TAG="symbian-latest"
-            TITLE="sisGram Symbian^3 / Belle (latest)"
+            TITLE="sisGram Symbian (latest)"
           fi
 
           # Recreate the release so an old .sis is never left attached and the
@@ -203,19 +249,20 @@ jobs:
             echo "2. Install the Qt runtime for your device **first**:"
             echo "   - Symbian^3 / Anna / Belle (N8, E7, C7, 700, 808...): \`Qt-4.7.4-Symbian3-Belle.sis\`"
             echo "   - S60 5th Edition (N97, 5800, X6...): \`Qt-4.7.3-S60-5th.sis\`"
-            echo "3. Then install \`sisGram.sis\` (UID3 \`0xE0713D51\`, ~1.8 MB)."
+            echo "   - S60 3rd Edition FP1 (Nokia E51, E71, N95...): \`Qt-4.6.3-S60-3rd-FP1-SmartInstaller.sis\`"
+            echo "3. Then install the matching app package:"
+            echo "   - \`sisGram.sis\` (UID3 \`0xE0713D51\`, Qt Quick) for Symbian^3 / Belle / S60 5th"
+            echo "   - \`sisGram-E51.sis\` (UID3 \`0xE0713D52\`, QWidget port) for S60 3rd FP1"
             echo
-            echo "Both Qt packages are the official ones shipped inside the Qt SDK; no third-party downloads needed."
-            echo
-            echo "**S60 3rd Edition FP1 (e.g. Nokia E51) is not supported:** Qt 4.7 / Qt Quick is not available for that platform, so the app cannot run there."
+            echo "All Qt packages are the official ones shipped inside Nokia Qt SDKs; no third-party downloads are needed. The E51 package is Nokia's Qt Smart Installer: it fetches the Qt 4.6.3 libraries from Nokia's servers, so it needs a working data connection at install time."
             echo
             echo "### Signing and capabilities"
             echo
-            echo "Self-signed with the toolchain development certificate (the phone asks for confirmation). Capabilities: ReadUserData, WriteUserData, UserEnvironment, NetworkServices, LocalServices."
+            echo "Both SIS files are self-signed with the toolchain development certificate (the phone asks for confirmation). Capabilities: ReadUserData, WriteUserData, UserEnvironment, NetworkServices, LocalServices."
             echo
             echo "### Telegram API credentials"
             echo
-            echo "This build has project credentials pre-filled from repository secrets. You can replace them on the first screen with your own from my.telegram.org/apps; they are stored only on the device."
+            echo "Both builds have the project credentials pre-filled from repository secrets. You can replace them on the first screen with your own from my.telegram.org/apps; they are stored only on the device."
           } > release-notes.md
 
           gh release create "$TAG" \
@@ -224,6 +271,8 @@ jobs:
             --notes-file release-notes.md \
             sisGram.sis \
             Qt-4.7.4-Symbian3-Belle.sis \
-            Qt-4.7.3-S60-5th.sis
+            Qt-4.7.3-S60-5th.sis \
+            "$RUNNER_TEMP/e51-out/sisGram-E51.sis" \
+            "$RUNNER_TEMP/e51-out/Qt-4.6.3-S60-3rd-FP1-SmartInstaller.sis"
 
-          echo "::notice::Published sisGram.sis + Qt runtimes at https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+          echo "::notice::Published sisGram.sis + sisGram-E51.sis + Qt runtimes at https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
